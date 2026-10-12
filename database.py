@@ -9,9 +9,18 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS trajets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT, plaque TEXT, km_depart REAL, km_arrivee REAL,
-            km_parcourus REAL, nb_pleins INTEGER, litres_ajoutes REAL,
-            colis_transportes INTEGER, colis_livres INTEGER,
+            date TEXT,
+            plaque TEXT,
+            chauffeur TEXT,
+            km_depart REAL,
+            km_arrivee REAL,
+            km_parcourus REAL,
+            nb_pleins INTEGER,
+            litres_ajoutes REAL,
+            prix_litre REAL,
+            colis_transportes INTEGER,
+            colis_livres_client INTEGER,
+            colis_livres_relais INTEGER,
             niveau_carburant_fin REAL
         )
     """)
@@ -30,23 +39,57 @@ def ajouter_trajet(data):
     c = conn.cursor()
     c.execute("""
         INSERT INTO trajets 
-        (date, plaque, km_depart, km_arrivee, km_parcourus, nb_pleins, 
-         litres_ajoutes, colis_transportes, colis_livres, niveau_carburant_fin)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (data["date"], data["plaque"], data["km_depart"], data["km_arrivee"],
-          data["km_parcourus"], data["nb_pleins"], data["litres_ajoutes"],
-          data["colis_transportes"], data["colis_livres"], data["niveau_carburant_fin"]))
+        (date, plaque, chauffeur, km_depart, km_arrivee, km_parcourus, 
+         nb_pleins, litres_ajoutes, prix_litre, colis_transportes, 
+         colis_livres_client, colis_livres_relais, niveau_carburant_fin)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        data["date"], data["plaque"], data.get("chauffeur", ""),
+        data["km_depart"], data["km_arrivee"], data["km_parcourus"],
+        data["nb_pleins"], data["litres_ajoutes"], data.get("prix_litre", 0),
+        data["colis_transportes"], data.get("colis_livres_client", 0),
+        data.get("colis_livres_relais", 0), data["niveau_carburant_fin"]
+    ))
     conn.commit()
     conn.close()
 
-def get_trajets(plaque=None, limite=50):
+def get_trajets(plaque=None, mois=None, annee=None, limite=500):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
+    query = "SELECT * FROM trajets WHERE 1=1"
+    params = []
+
     if plaque:
-        c.execute("SELECT * FROM trajets WHERE plaque=? ORDER BY date DESC LIMIT ?", (plaque, limite))
-    else:
-        c.execute("SELECT * FROM trajets ORDER BY date DESC LIMIT ?", (limite,))
+        query += " AND plaque=?"
+        params.append(plaque)
+    if mois and mois != "Tous":
+        query += " AND strftime('%m', date) = ?"
+        params.append(f"{int(mois):02d}")
+    if annee and annee != "Toutes":
+        query += " AND strftime('%Y', date) = ?"
+        params.append(str(annee))
+
+    query += " ORDER BY date DESC LIMIT ?"
+    params.append(limite)
+
+    c.execute(query, params)
     rows = c.fetchall()
+    conn.close()
+    return rows
+
+def get_toutes_plaques():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT plaque FROM trajets ORDER BY plaque")
+    rows = [r[0] for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def get_toutes_annees():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT strftime('%Y', date) FROM trajets ORDER BY date DESC")
+    rows = [r[0] for r in c.fetchall() if r[0]]
     conn.close()
     return rows
 
