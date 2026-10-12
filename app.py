@@ -1,8 +1,10 @@
 import streamlit as st
 from datetime import datetime
 import pandas as pd
-from database import init_db, ajouter_trajet, get_trajets, get_vehicule, save_vehicule
-from calculs import calculer_km, estimer_carburant_restant, calculer_moyennes
+from database import (init_db, ajouter_trajet, get_trajets, get_vehicule,
+                      save_vehicule, get_toutes_plaques, get_toutes_annees)
+from calculs import (calculer_km, estimer_carburant_restant,
+                     calculer_moyennes, calculer_cout_gasoil)
 
 st.set_page_config(
     page_title="Gestion Camion",
@@ -13,27 +15,63 @@ st.set_page_config(
 init_db()
 
 st.title("🚛 Gestion Trajets & Carburant")
-st.markdown("Enregistre tes trajets, pleins et colis. Le logiciel calcule automatiquement ta consommation.")
+st.markdown("Enregistre tes trajets, pleins et colis. Les calculs se font automatiquement.")
 
-onglet1, onglet2, onglet3 = st.tabs(["📝 Nouveau trajet", "📊 Statistiques", "⚙️ Config véhicule"])
+# ================= SIDEBAR : FILTRES =================
+st.sidebar.header("🔍 Filtres")
+plaques_dispo = get_toutes_plaques()
+annees_dispo = get_toutes_annees()
+
+plaque_filtre = st.sidebar.selectbox(
+    "Plaque",
+    ["Toutes"] + plaques_dispo
+)
+mois_filtre = st.sidebar.selectbox(
+    "Mois",
+    ["Tous", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+)
+annee_filtre = st.sidebar.selectbox(
+    "Année",
+    ["Toutes"] + annees_dispo
+)
+
+# ================= ONGLETS =================
+onglet1, onglet2, onglet3 = st.tabs([
+    "📝 Nouveau trajet",
+    "📊 Statistiques",
+    "⚙️ Config véhicule"
+])
 
 # ---------- ONGLET 1 : Nouveau trajet ----------
 with onglet1:
-    st.subheader("Enregistrer un trajet")
+    st.subheader("📝 Enregistrer un trajet")
+    st.markdown("Remplis les informations puis clique sur **Enregistrer**.")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        plaque = st.text_input("Plaque d'immatriculation", placeholder="AB-123-CD")
-        km_depart = st.number_input("Km au départ", min_value=0.0, value=0.0, step=1.0)
-        nb_pleins = st.number_input("Nombre de pleins effectués", min_value=0, value=0, step=1)
-        colis_transp = st.number_input("Colis transportés", min_value=0, value=0, step=1)
-    with col2:
-        niveau_debut = st.number_input("Niveau carburant au départ (L)", min_value=0.0, value=0.0, step=1.0)
-        km_arrivee = st.number_input("Km à l'arrivée", min_value=0.0, value=0.0, step=1.0)
-        litres_ajoutes = st.number_input("Litres ajoutés au total", min_value=0.0, value=0.0, step=1.0)
-        colis_livres = st.number_input("Colis livrés", min_value=0, value=0, step=1)
+    with st.form("form_trajet", clear_on_submit=False):
+        col1, col2 = st.columns(2)
 
-    if st.button("💾 Enregistrer le trajet", type="primary"):
+        with col1:
+            st.markdown("### 🚛 Informations véhicule")
+            plaque = st.text_input("Plaque d'immatriculation *", placeholder="AB-123-CD")
+            chauffeur = st.text_input("Nom du chauffeur", placeholder="Ex: Jean")
+            km_depart = st.number_input("Km au départ", min_value=0.0, value=0.0, step=1.0)
+            km_arrivee = st.number_input("Km à l'arrivée", min_value=0.0, value=0.0, step=1.0)
+            niveau_debut = st.number_input("Niveau carburant au départ (L)", min_value=0.0, value=0.0, step=1.0)
+
+        with col2:
+            st.markdown("### ⛽ Carburant")
+            nb_pleins = st.number_input("Nombre de pleins effectués", min_value=0, value=0, step=1)
+            litres_ajoutes = st.number_input("Litres ajoutés au total", min_value=0.0, value=0.0, step=1.0)
+            prix_litre = st.number_input("Prix du litre (€)", min_value=0.0, value=1.70, step=0.01, format="%.2f")
+
+            st.markdown("### 📦 Colis")
+            colis_transp = st.number_input("Colis transportés", min_value=0, value=0, step=1)
+            colis_client = st.number_input("Colis livrés au client", min_value=0, value=0, step=1)
+            colis_relais = st.number_input("Colis livrés en relais", min_value=0, value=0, step=1)
+
+        soumettre = st.form_submit_button("💾 Enregistrer le trajet", type="primary")
+
+    if soumettre:
         try:
             if not plaque:
                 st.error("❌ Renseigne la plaque d'immatriculation.")
@@ -49,72 +87,85 @@ with onglet1:
                 carburant_restant = estimer_carburant_restant(
                     niveau_debut, litres_ajoutes, km, conso_moyenne
                 )
+                cout_gasoil = calculer_cout_gasoil(litres_ajoutes, prix_litre)
 
                 data = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "plaque": plaque,
+                    "chauffeur": chauffeur,
                     "km_depart": km_depart,
                     "km_arrivee": km_arrivee,
                     "km_parcourus": km,
                     "nb_pleins": int(nb_pleins),
                     "litres_ajoutes": litres_ajoutes,
+                    "prix_litre": prix_litre,
                     "colis_transportes": int(colis_transp),
-                    "colis_livres": int(colis_livres),
+                    "colis_livres_client": int(colis_client),
+                    "colis_livres_relais": int(colis_relais),
                     "niveau_carburant_fin": round(carburant_restant, 2)
                 }
                 ajouter_trajet(data)
 
-                st.success("✅ Trajet enregistré !")
-                st.markdown(f"""
-                - 🚛 **Plaque** : {plaque}
-                - 📏 **Km parcourus** : {km:.1f} km
-                - ⛽ **Carburant restant estimé** : {carburant_restant:.1f} L
-                - 📦 **Colis livrés** : {int(colis_livres)}/{int(colis_transp)}
-                """)
+                st.success("✅ Trajet enregistré avec succès !")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("📏 Km parcourus", f"{km:.1f} km")
+                c2.metric("⛽ Carburant restant", f"{carburant_restant:.1f} L")
+                c3.metric("💰 Coût gasoil", f"{cout_gasoil:.2f} €")
+                c4.metric("📦 Colis livrés", f"{int(colis_client) + int(colis_relais)}/{int(colis_transp)}")
         except Exception as e:
             st.error(f"❌ Erreur : {e}")
 
 # ---------- ONGLET 2 : Statistiques ----------
 with onglet2:
-    st.subheader("📊 Statistiques")
+    st.subheader("📊 Statistiques & Historique")
 
-    plaque_stats = st.text_input("Plaque à consulter", key="plaque_stats")
+    plaque_stats = plaque_filtre if plaque_filtre != "Toutes" else None
+    mois_stats = mois_filtre if mois_filtre != "Tous" else None
+    annee_stats = annee_filtre if annee_filtre != "Toutes" else None
 
-    if st.button("Afficher les statistiques"):
-        if not plaque_stats:
-            st.warning("Renseigne une plaque.")
-        else:
-            trajets = get_trajets(plaque_stats)
-            if not trajets:
-                st.info(f"Aucun trajet pour {plaque_stats}.")
-            else:
-                moyennes = calculer_moyennes(trajets)
-                carburant_restant = trajets[0][10]
+    trajets = get_trajets(plaque_stats, mois_stats, annee_stats)
 
-                col1, col2, col3 = st.columns(3)
-                col1.metric("⛽ Conso moyenne", f"{moyennes['conso']} L/100km")
-                col2.metric("🛢️ Carburant restant", f"{carburant_restant:.1f} L")
-                col3.metric("📅 Trajets enregistrés", len(trajets))
+    if not trajets:
+        st.info("Aucun trajet trouvé avec ces filtres. Modifie les filtres dans la barre de gauche.")
+    else:
+        moyennes = calculer_moyennes(trajets)
+        carburant_restant = trajets[0][13]
 
-                col4, col5, col6 = st.columns(3)
-                col4.metric("📦 Colis transp./jour", moyennes['colis_transp'])
-                col5.metric("✅ Colis livrés/jour", moyennes['colis_livres'])
-                col6.metric("🎯 Taux livraison", f"{moyennes['taux_livraison']} %")
+        st.markdown("### 🎯 Résumé global")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("⛽ Conso moyenne", f"{moyennes['conso']} L/100km")
+        c2.metric("🛢️ Carburant restant", f"{carburant_restant:.1f} L")
+        c3.metric("📅 Trajets", len(trajets))
+        c4.metric("📏 Km total", f"{moyennes['total_km']:.0f} km")
 
-                st.subheader("Historique des trajets")
-                df = pd.DataFrame(trajets, columns=[
-                    "ID", "Date", "Plaque", "Km départ", "Km arrivée", "Km parcourus",
-                    "Nb pleins", "Litres ajoutés", "Colis transp.", "Colis livrés", "Carburant fin (L)"
-                ])
-                st.dataframe(df, use_container_width=True)
+        st.markdown("### 📦 Colis")
+        c5, c6, c7, c8 = st.columns(4)
+        c5.metric("📦 Transp./jour", moyennes['colis_transp'])
+        c6.metric("🏠 Livrés client/jour", moyennes['colis_client'])
+        c7.metric("🏪 Livrés relais/jour", moyennes['colis_relais'])
+        c8.metric("🎯 Taux livraison", f"{moyennes['taux_livraison']} %")
 
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    "📥 Télécharger en CSV",
-                    csv,
-                    f"trajets_{plaque_stats}.csv",
-                    "text/csv"
-                )
+        st.markdown("### 💰 Coût du gasoil")
+        c9, c10, c11 = st.columns(3)
+        c9.metric("💶 Coût total", f"{moyennes['cout_total']:.2f} €")
+        c10.metric("📆 Coût moyen/jour", f"{moyennes['cout_moyen_jour']:.2f} €")
+        c11.metric("🛢️ Litres totaux", f"{moyennes['total_litres']:.1f} L")
+
+        st.markdown("### 📋 Historique détaillé")
+        df = pd.DataFrame(trajets, columns=[
+            "ID", "Date", "Plaque", "Chauffeur", "Km départ", "Km arrivée",
+            "Km parcourus", "Nb pleins", "Litres ajoutés", "Prix/L (€)",
+            "Colis transp.", "Livrés client", "Livrés relais", "Carburant fin (L)"
+        ])
+        st.dataframe(df, use_container_width=True)
+
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Télécharger l'historique en CSV",
+            csv,
+            f"trajets_{datetime.now().strftime('%Y%m%d')}.csv",
+            "text/csv"
+        )
 
 # ---------- ONGLET 3 : Config véhicule ----------
 with onglet3:
