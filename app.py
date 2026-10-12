@@ -4,7 +4,7 @@ import pandas as pd
 from database import (init_db, ajouter_trajet, get_trajets, get_vehicule,
                       save_vehicule, get_toutes_plaques, get_toutes_annees)
 from calculs import (calculer_km, estimer_carburant_restant,
-                     calculer_moyennes, calculer_cout_gasoil)
+                     calculer_moyennes, calculer_cout_gasoil, get_col)
 
 st.set_page_config(
     page_title="Gestion Camion",
@@ -22,18 +22,12 @@ st.sidebar.header("🔍 Filtres")
 plaques_dispo = get_toutes_plaques()
 annees_dispo = get_toutes_annees()
 
-plaque_filtre = st.sidebar.selectbox(
-    "Plaque",
-    ["Toutes"] + plaques_dispo
-)
+plaque_filtre = st.sidebar.selectbox("Plaque", ["Toutes"] + plaques_dispo)
 mois_filtre = st.sidebar.selectbox(
     "Mois",
     ["Tous", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
 )
-annee_filtre = st.sidebar.selectbox(
-    "Année",
-    ["Toutes"] + annees_dispo
-)
+annee_filtre = st.sidebar.selectbox("Année", ["Toutes"] + annees_dispo)
 
 # ================= ONGLETS =================
 onglet1, onglet2, onglet3 = st.tabs([
@@ -126,10 +120,10 @@ with onglet2:
     trajets = get_trajets(plaque_stats, mois_stats, annee_stats)
 
     if not trajets:
-        st.info("Aucun trajet trouvé avec ces filtres. Modifie les filtres dans la barre de gauche.")
+        st.info("Aucun trajet trouvé avec ces filtres.")
     else:
         moyennes = calculer_moyennes(trajets)
-        carburant_restant = trajets[0][13]
+        carburant_restant = get_col(trajets[0], 13, 0)
 
         st.markdown("### 🎯 Résumé global")
         c1, c2, c3, c4 = st.columns(4)
