@@ -31,22 +31,21 @@ def login():
             else:
                 st.error("❌ Identifiants incorrects")
 
-                       st.markdown("---")
+        st.markdown("---")
         st.caption("💡 Contacte ton administrateur pour obtenir un compte")
 
-        # ===== BOUTON RESET (à retirer après usage) =====
+        # ===== BOUTON RESET (temporaire - à retirer après usage) =====
         st.markdown("---")
-        if st.button("🔧 Réinitialiser la base (admin seulement)"):
+        if st.button("🔧 Réinitialiser la base"):
             import os
             from database import init_db
             if os.path.exists("donnees.db"):
                 os.remove("donnees.db")
             init_db()
-            st.success("✅ Base réinitialisée ! Tu peux te connecter avec serhane / stef57340")
+            st.success("✅ Base réinitialisée ! Connecte-toi avec serhane / stef57340")
             st.balloons()
 
     return None
-
 
 def logout():
     """Déconnexion."""
