@@ -11,6 +11,14 @@ def estimer_carburant_restant(niveau_depart, litres_ajoutes, km_parcourus, conso
 def calculer_cout_gasoil(litres_ajoutes, prix_litre):
     return litres_ajoutes * prix_litre
 
+def get_col(t, index, default=0):
+    """Récupère une valeur en sécurité, même si l'index n'existe pas."""
+    try:
+        val = t[index]
+        return val if val is not None else default
+    except (IndexError, TypeError):
+        return default
+
 def calculer_moyennes(trajets):
     if not trajets:
         return {
@@ -19,12 +27,14 @@ def calculer_moyennes(trajets):
             "cout_moyen_jour": 0, "total_litres": 0, "total_km": 0
         }
 
-    total_km = sum(t[6] for t in trajets if t[6])
-    total_litres = sum(t[8] for t in trajets if t[8])
-    total_transp = sum(t[10] for t in trajets if t[10])
-    total_client = sum(t[11] for t in trajets if t[11])
-    total_relais = sum(t[12] for t in trajets if t[12])
-    total_cout = sum((t[8] or 0) * (t[9] or 0) for t in trajets)
+    total_km = sum(get_col(t, 6) for t in trajets)
+    total_litres = sum(get_col(t, 8) for t in trajets)
+    total_transp = sum(get_col(t, 10) for t in trajets)
+    total_client = sum(get_col(t, 11) for t in trajets)
+    total_relais = sum(get_col(t, 12) for t in trajets)
+    total_cout = sum(
+        get_col(t, 8) * get_col(t, 9, 1.70) for t in trajets
+    )
     total_livres = total_client + total_relais
 
     conso = (total_litres / total_km * 100) if total_km > 0 else 0
