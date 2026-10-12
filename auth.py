@@ -1,15 +1,5 @@
 import streamlit as st
-import extra_streamlit_components as stx
 from database import get_user
-
-# Compteur global pour générer des clés uniques
-if "cookie_key_counter" not in st.session_state:
-    st.session_state.cookie_key_counter = 0
-
-def get_cookie_manager():
-    """Retourne un CookieManager avec une clé unique à chaque appel."""
-    st.session_state.cookie_key_counter += 1
-    return stx.CookieManager(key=f"camion_cookies_{st.session_state.cookie_key_counter}")
 
 def login():
     """Affiche l'écran de connexion. Retourne (username, role, nom)."""
@@ -19,17 +9,10 @@ def login():
     if st.session_state.user:
         return st.session_state.user
 
-    # Récupérer les identifiants sauvegardés dans les cookies
-    # On utilise une clé fixe pour la lecture
-    cookie_manager = stx.CookieManager(key="camion_cookies_read")
-
-    try:
-        saved_user = cookie_manager.get("camion_user") or ""
-        saved_pass = cookie_manager.get("camion_pass") or ""
-    except:
-        saved_user = ""
-        saved_pass = ""
-
+    # Récupérer les identifiants depuis les paramètres d'URL
+    query_params = st.query_params
+    saved_user = query_params.get("u", "")
+    saved_pass = query_params.get("p", "")
     remember_checked = bool(saved_user)
 
     st.markdown("""
@@ -50,14 +33,15 @@ def login():
         if submit:
             user = get_user(username)
             if user and user[1] == password:
-                # Sauvegarder dans les cookies si demandé
+                # Si "se souvenir" est coché, on met dans l'URL
                 if remember:
-                    cookie_manager.set("camion_user", username)
-                    cookie_manager.set("camion_pass", password)
+                    st.query_params["u"] = username
+                    st.query_params["p"] = password
                 else:
+                    # Sinon on efface
                     try:
-                        cookie_manager.delete("camion_user")
-                        cookie_manager.delete("camion_pass")
+                        del st.query_params["u"]
+                        del st.query_params["p"]
                     except:
                         pass
 
