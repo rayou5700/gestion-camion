@@ -2,11 +2,6 @@ import streamlit as st
 import extra_streamlit_components as stx
 from database import get_user
 
-# Gestionnaire de cookies
-@st.cache_resource
-def get_cookie_manager():
-    return stx.CookieManager()
-
 def login():
     """Affiche l'écran de connexion. Retourne (username, role, nom)."""
     if "user" not in st.session_state:
@@ -15,7 +10,8 @@ def login():
     if st.session_state.user:
         return st.session_state.user
 
-    cookie_manager = get_cookie_manager()
+    # Gestionnaire de cookies (SANS cache)
+    cookie_manager = stx.CookieManager(key="camion_cookies")
 
     # Récupérer les identifiants sauvegardés dans les cookies
     saved_user = cookie_manager.get("camion_user") or ""
@@ -42,10 +38,9 @@ def login():
             if user and user[1] == password:
                 # Sauvegarder dans les cookies si demandé
                 if remember:
-                    cookie_manager.set("camion_user", username, expires_at=None)
-                    cookie_manager.set("camion_pass", password, expires_at=None)
+                    cookie_manager.set("camion_user", username)
+                    cookie_manager.set("camion_pass", password)
                 else:
-                    # Effacer les cookies
                     try:
                         cookie_manager.delete("camion_user")
                         cookie_manager.delete("camion_pass")
