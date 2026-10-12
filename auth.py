@@ -34,17 +34,6 @@ def login():
         st.markdown("---")
         st.caption("💡 Contacte ton administrateur pour obtenir un compte")
 
-        # ===== BOUTON RESET (temporaire - à retirer après usage) =====
-        st.markdown("---")
-        if st.button("🔧 Réinitialiser la base"):
-            import os
-            from database import init_db
-            if os.path.exists("donnees.db"):
-                os.remove("donnees.db")
-            init_db()
-            st.success("✅ Base réinitialisée ! Connecte-toi avec serhane / stef57340")
-            st.balloons()
-
     return None
 
 def logout():
