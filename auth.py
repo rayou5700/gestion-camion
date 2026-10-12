@@ -1,5 +1,11 @@
 import streamlit as st
+import extra_streamlit_components as stx
 from database import get_user
+
+# Gestionnaire de cookies
+@st.cache_resource
+def get_cookie_manager():
+    return stx.CookieManager()
 
 def login():
     """Affiche l'écran de connexion. Retourne (username, role, nom)."""
@@ -9,10 +15,12 @@ def login():
     if st.session_state.user:
         return st.session_state.user
 
-    # Récupérer les identifiants sauvegardés (dans les cookies du navigateur)
-    saved_user = st.session_state.get("saved_username", "")
-    saved_pass = st.session_state.get("saved_password", "")
-    remember_checked = st.session_state.get("remember_me", False)
+    cookie_manager = get_cookie_manager()
+
+    # Récupérer les identifiants sauvegardés dans les cookies
+    saved_user = cookie_manager.get("camion_user") or ""
+    saved_pass = cookie_manager.get("camion_pass") or ""
+    remember_checked = bool(saved_user)
 
     st.markdown("""
         <div style='text-align:center; padding: 40px;'>
@@ -32,15 +40,17 @@ def login():
         if submit:
             user = get_user(username)
             if user and user[1] == password:
-                # Sauvegarder ou effacer les identifiants
+                # Sauvegarder dans les cookies si demandé
                 if remember:
-                    st.session_state.saved_username = username
-                    st.session_state.saved_password = password
-                    st.session_state.remember_me = True
+                    cookie_manager.set("camion_user", username, expires_at=None)
+                    cookie_manager.set("camion_pass", password, expires_at=None)
                 else:
-                    st.session_state.saved_username = ""
-                    st.session_state.saved_password = ""
-                    st.session_state.remember_me = False
+                    # Effacer les cookies
+                    try:
+                        cookie_manager.delete("camion_user")
+                        cookie_manager.delete("camion_pass")
+                    except:
+                        pass
 
                 st.session_state.user = (user[0], user[2], user[3])
                 st.rerun()
