@@ -2,6 +2,15 @@ import streamlit as st
 import extra_streamlit_components as stx
 from database import get_user
 
+# Compteur global pour générer des clés uniques
+if "cookie_key_counter" not in st.session_state:
+    st.session_state.cookie_key_counter = 0
+
+def get_cookie_manager():
+    """Retourne un CookieManager avec une clé unique à chaque appel."""
+    st.session_state.cookie_key_counter += 1
+    return stx.CookieManager(key=f"camion_cookies_{st.session_state.cookie_key_counter}")
+
 def login():
     """Affiche l'écran de connexion. Retourne (username, role, nom)."""
     if "user" not in st.session_state:
@@ -10,12 +19,17 @@ def login():
     if st.session_state.user:
         return st.session_state.user
 
-    # Gestionnaire de cookies (SANS cache)
-    cookie_manager = stx.CookieManager(key="camion_cookies")
-
     # Récupérer les identifiants sauvegardés dans les cookies
-    saved_user = cookie_manager.get("camion_user") or ""
-    saved_pass = cookie_manager.get("camion_pass") or ""
+    # On utilise une clé fixe pour la lecture
+    cookie_manager = stx.CookieManager(key="camion_cookies_read")
+
+    try:
+        saved_user = cookie_manager.get("camion_user") or ""
+        saved_pass = cookie_manager.get("camion_pass") or ""
+    except:
+        saved_user = ""
+        saved_pass = ""
+
     remember_checked = bool(saved_user)
 
     st.markdown("""
