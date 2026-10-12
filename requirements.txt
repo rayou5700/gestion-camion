@@ -1,2 +1,5 @@
 streamlit
 pandas
+plotly
+streamlit-calendar
+Pillow
