@@ -140,8 +140,9 @@ with tab1:
         st.session_state.km_depart_photo = None
         st.session_state.km_arrivee_photo = None
 
-    with st.form("form_trajet", clear_on_submit=False):
-        col1, col2 = st.columns(2)
+        with st.form("form_trajet", clear_on_submit=False):
+        # Sur mobile : une seule colonne. Sur PC : 2 colonnes
+        col1, col2 = st.columns([1, 1])
 
         with col1:
             st.markdown("### 🚛 Informations véhicule")
