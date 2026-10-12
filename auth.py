@@ -31,12 +31,11 @@ def login():
             else:
                 st.error("❌ Identifiants incorrects")
 
-        st.markdown("---")
-        st.caption("💡 Comptes par défaut :")
-        st.caption("Admin : `admin` / `admin123`")
-        st.caption("Salarié : `jean` / `jean123`")
+                st.markdown("---")
+        st.caption("💡 Contacte ton administrateur pour obtenir un compte")
 
     return None
+
 
 def logout():
     """Déconnexion."""
