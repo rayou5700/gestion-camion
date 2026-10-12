@@ -23,7 +23,6 @@ st.set_page_config(
 # ============ CSS POUR MOBILE ============
 st.markdown("""
 <style>
-/* Boutons plus gros */
 .stButton > button {
     width: 100%;
     height: 55px;
@@ -31,12 +30,10 @@ st.markdown("""
     font-weight: bold;
     border-radius: 10px;
 }
-/* Champs de saisie plus gros */
 .stTextInput input, .stNumberInput input, .stDateInput input {
     height: 50px;
     font-size: 16px;
 }
-/* Onglets plus visibles */
 .stTabs [data-baseweb="tab-list"] {
     gap: 4px;
 }
@@ -46,17 +43,16 @@ st.markdown("""
     font-weight: 600;
     padding: 0 10px;
 }
-/* Espacement */
 .block-container {
     padding-top: 1rem;
     padding-bottom: 1rem;
 }
-/* Titres */
 h1 { font-size: 1.8rem !important; }
 h2 { font-size: 1.4rem !important; }
 h3 { font-size: 1.2rem !important; }
 </style>
 """, unsafe_allow_html=True)
+
 init_db()
 
 # ============ CONNEXION OBLIGATOIRE ============
@@ -133,16 +129,12 @@ else:
 with tab1:
     st.subheader("📝 Enregistrer un trajet")
 
-    # Initialiser les photos dans session_state
     if "photo_depart" not in st.session_state:
         st.session_state.photo_depart = None
         st.session_state.photo_arrivee = None
-        st.session_state.km_depart_photo = None
-        st.session_state.km_arrivee_photo = None
 
-        with st.form("form_trajet", clear_on_submit=False):
-        # Sur mobile : une seule colonne. Sur PC : 2 colonnes
-        col1, col2 = st.columns([1, 1])
+    with st.form("form_trajet", clear_on_submit=False):
+        col1, col2 = st.columns(2)
 
         with col1:
             st.markdown("### 🚛 Informations véhicule")
@@ -255,7 +247,6 @@ with tab1:
                 }
                 ajouter_trajet(data)
 
-                # Reset photos
                 st.session_state.photo_depart = None
                 st.session_state.photo_arrivee = None
 
@@ -280,6 +271,8 @@ if tab2:
         trajets = get_trajets(plaque_stats, mois_stats, annee_stats)
         if role == "salarie":
             trajets = [t for t in trajets if get_col(t, 3) == nom_complet]
+
+        trajets = [t for t in trajets if len(t) >= 20]
 
         if not trajets:
             st.info("Aucun trajet trouvé.")
@@ -331,6 +324,7 @@ if tab3:
 
         plaque_stats = plaque_filtre if plaque_filtre != "Toutes" else None
         trajets = get_trajets(plaque_stats, limite=200)
+        trajets = [t for t in trajets if len(t) >= 20]
 
         if not trajets:
             st.info("Aucune donnée pour les graphiques.")
@@ -345,7 +339,6 @@ if tab3:
             df["Date"] = pd.to_datetime(df["Date"])
             df = df.sort_values("Date")
 
-            # Courbe de consommation
             df["Conso"] = (df["Litres"] / df["Km parcourus"] * 100).round(2)
             df_conso = df[df["Conso"] > 0]
 
@@ -355,7 +348,6 @@ if tab3:
                              markers=True, title="Évolution de la consommation")
                 st.plotly_chart(fig, use_container_width=True)
 
-            # Camembert des colis
             st.markdown("### 📦 Répartition des colis")
             total_client = df["Client"].sum()
             total_relais = df["Relais"].sum()
@@ -369,12 +361,10 @@ if tab3:
             )
             st.plotly_chart(fig2, use_container_width=True)
 
-            # Histogramme km par jour
             st.markdown("### 📏 Km parcourus par jour")
             fig3 = px.bar(df, x="Date", y="Km parcourus", title="Km par jour")
             st.plotly_chart(fig3, use_container_width=True)
 
-            # Coût par jour
             df["Cout"] = df["Litres"] * df["Prix/L"]
             fig4 = px.bar(df[df["Cout"] > 0], x="Date", y="Cout",
                          title="Coût gasoil par jour (€)")
@@ -403,6 +393,7 @@ if tab4:
 
         st.markdown("### 📦 Colis non livrés")
         trajets_recents = get_trajets(limite=20)
+        trajets_recents = [t for t in trajets_recents if len(t) >= 20]
         for t in trajets_recents:
             non_livres = get_col(t, 13, 0)
             if non_livres > 0:
@@ -412,6 +403,7 @@ if tab4:
 
         st.markdown("### 📊 Consommation anormale")
         trajets_all = get_trajets(limite=100)
+        trajets_all = [t for t in trajets_all if len(t) >= 20]
         if len(trajets_all) > 5:
             m = calculer_moyennes(trajets_all)
             conso_moy = m['conso']
@@ -429,6 +421,7 @@ if tab5:
         st.subheader("📅 Calendrier des trajets")
 
         trajets = get_trajets(limite=200)
+        trajets = [t for t in trajets if len(t) >= 20]
         if role == "salarie":
             trajets = [t for t in trajets if get_col(t, 3) == nom_complet]
 
@@ -445,7 +438,6 @@ if tab5:
             df["Date"] = pd.to_datetime(df["Date"])
             df["Jour"] = df["Date"].dt.date
 
-            # Résumé par jour
             resume = df.groupby("Jour").agg({
                 "Km parcourus": "sum",
                 "Client": "sum",
@@ -456,7 +448,6 @@ if tab5:
 
             st.dataframe(resume, use_container_width=True)
 
-            # Graphique
             fig = px.bar(resume, x="Jour", y="Km", title="Km par jour")
             st.plotly_chart(fig, use_container_width=True)
 
@@ -574,7 +565,7 @@ if tab8:
                 role_badge = "👑 Admin" if u[2] == "admin" else "🚚 Salarié"
                 st.markdown(f"**{u[3]}** (`{u[0]}`) - {role_badge}")
             with col2:
-                if u[0] != "admin" and st.button("🗑️", key=f"del_user_{u[0]}"):
+                if u[0] != "serhane" and st.button("🗑️", key=f"del_user_{u[0]}"):
                     supprimer_user(u[0])
                     st.rerun()
 
