@@ -74,13 +74,11 @@ def init_db():
         )
     """)
 
-    # Créer admin par défaut s'il n'existe pas
+        # Créer admin par défaut s'il n'existe pas
     c.execute("SELECT COUNT(*) FROM utilisateurs WHERE role='admin'")
     if c.fetchone()[0] == 0:
         c.execute("INSERT INTO utilisateurs VALUES (?, ?, ?, ?)",
-                  ("admin", "admin123", "admin", "Administrateur"))
-        c.execute("INSERT INTO utilisateurs VALUES (?, ?, ?, ?)",
-                  ("jean", "jean123", "salarie", "Jean Dupont"))
+                  ("serhane", "stef57340", "admin", "Serhane"))
 
     conn.commit()
     conn.close()
