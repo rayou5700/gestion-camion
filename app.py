@@ -16,9 +16,47 @@ from auth import login, logout, is_admin
 st.set_page_config(
     page_title="Gestion Camion",
     page_icon="🚛",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
+# ============ CSS POUR MOBILE ============
+st.markdown("""
+<style>
+/* Boutons plus gros */
+.stButton > button {
+    width: 100%;
+    height: 55px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 10px;
+}
+/* Champs de saisie plus gros */
+.stTextInput input, .stNumberInput input, .stDateInput input {
+    height: 50px;
+    font-size: 16px;
+}
+/* Onglets plus visibles */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 4px;
+}
+.stTabs [data-baseweb="tab"] {
+    height: 50px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0 10px;
+}
+/* Espacement */
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+/* Titres */
+h1 { font-size: 1.8rem !important; }
+h2 { font-size: 1.4rem !important; }
+h3 { font-size: 1.2rem !important; }
+</style>
+""", unsafe_allow_html=True)
 init_db()
 
 # ============ CONNEXION OBLIGATOIRE ============
