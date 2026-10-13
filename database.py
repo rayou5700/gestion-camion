@@ -290,3 +290,13 @@ def supprimer_planning(planning_id):
     c.execute("DELETE FROM planning WHERE id=?", (planning_id,))
     conn.commit()
     conn.close()
+    
+
+def get_photos_trajet(trajet_id):
+    """Récupère les photos d'un trajet (base64)."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT photo_depart, photo_arrivee FROM trajets WHERE id=?", (trajet_id,))
+    row = c.fetchone()
+    conn.close()
+    return row if row else (None, None)
