@@ -15,6 +15,7 @@ from calculs import (calculer_km, estimer_carburant_restant,
                      calculer_moyennes, calculer_cout_gasoil, get_col,
                      calculer_heures_travail)
 from auth import login, logout, is_admin
+from github_db import init_sync, upload_db
 
 st.set_page_config(
     page_title="Gestion Camion",
@@ -56,6 +57,8 @@ h3 { font-size: 1.2rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
+# ============ SYNCHRO GITHUB ============
+init_sync()
 init_db()
 
 # ============ CONNEXION OBLIGATOIRE ============
@@ -67,13 +70,11 @@ username, role, nom_complet = user
 
 # ============ FONCTIONS UTILITAIRES PHOTOS ============
 def image_to_base64(uploaded_file):
-    """Convertit un fichier uploadé en base64."""
     if uploaded_file is None:
         return ""
     try:
         img = Image.open(uploaded_file)
         img.thumbnail((800, 800))
-        # Convertir en RGB si nécessaire (pour éviter les erreurs avec PNG transparent)
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
         buffer = BytesIO()
@@ -83,7 +84,6 @@ def image_to_base64(uploaded_file):
         return ""
 
 def base64_to_image(b64_string):
-    """Convertit du base64 en image affichable."""
     if not b64_string:
         return None
     try:
@@ -258,7 +258,6 @@ with tab1:
                 cout_gasoil = calculer_cout_gasoil(litres_ajoutes, prix_litre)
                 heures = calculer_heures_travail(heure_debut, heure_fin)
 
-                # Convertir les photos en base64
                 photo_depart_b64 = image_to_base64(st.session_state.photo_depart)
                 photo_arrivee_b64 = image_to_base64(st.session_state.photo_arrivee)
 
@@ -279,6 +278,7 @@ with tab1:
                     "valide": 1
                 }
                 ajouter_trajet(data)
+                upload_db(f"Nouveau trajet {plaque}")
 
                 st.session_state.photo_depart = None
                 st.session_state.photo_arrivee = None
@@ -335,7 +335,6 @@ if tab2:
             c12.metric("🛢️ Litres totaux", f"{m['total_litres']:.1f} L")
             c13.metric("🕐 Heures totales", f"{m['total_heures']:.1f} h")
 
-            # ========= PHOTOS DES TRAJETS (admin seulement) =========
             if role == "admin":
                 st.markdown("### 📸 Photos des trajets récents")
                 st.caption("Clique sur un trajet pour voir les photos km départ/arrivée")
@@ -380,7 +379,6 @@ if tab2:
                 "Carburant (L)", "Photo départ", "Photo arrivée",
                 "H début", "H fin", "Validé"
             ])
-            # Masquer le contenu base64 pour l'affichage
             df_display = df.drop(columns=["Photo départ", "Photo arrivée"])
             st.dataframe(df_display, use_container_width=True)
 
@@ -543,6 +541,7 @@ if tab6:
 
         if submit:
             ajouter_planning(str(date_plan), chauffeur_plan, plaque_plan, description)
+            upload_db("Nouveau planning")
             st.success("✅ Ajouté au planning")
             st.rerun()
 
@@ -562,6 +561,7 @@ if tab6:
                     with col2:
                         if st.button("🗑️", key=f"del_plan_{p[0]}"):
                             supprimer_planning(p[0])
+                            upload_db("Suppression planning")
                             st.rerun()
 
 # ================= ONGLET 7 : CONGÉS =================
@@ -584,6 +584,7 @@ if tab7:
 
             if submit:
                 ajouter_conge(chauffeur_conge, str(debut), str(fin), motif)
+                upload_db("Nouveau congé")
                 st.success("✅ Congé ajouté")
                 st.rerun()
 
@@ -604,6 +605,7 @@ if tab7:
                 with col2:
                     if role == "admin" and st.button("🗑️", key=f"del_conge_{c[0]}"):
                         supprimer_conge(c[0])
+                        upload_db("Suppression congé")
                         st.rerun()
 
 # ================= ONGLET 8 : UTILISATEURS (admin only) =================
@@ -624,6 +626,7 @@ if tab8:
         if submit:
             if new_user and new_pass and new_nom:
                 creer_user(new_user, new_pass, new_role, new_nom)
+                upload_db(f"Création utilisateur {new_user}")
                 st.success(f"✅ Utilisateur {new_user} enregistré")
                 st.rerun()
             else:
@@ -639,6 +642,7 @@ if tab8:
             with col2:
                 if u[0] != "serhane" and st.button("🗑️", key=f"del_user_{u[0]}"):
                     supprimer_user(u[0])
+                    upload_db("Suppression utilisateur")
                     st.rerun()
 
 # ================= ONGLET 9 : CONFIG =================
@@ -651,6 +655,16 @@ if tab9:
         if st.button("Enregistrer la configuration"):
             if plaque_cfg:
                 save_vehicule(plaque_cfg, capacite_cfg, conso_cfg)
+                upload_db(f"Config véhicule {plaque_cfg}")
                 st.success(f"✅ {plaque_cfg} configuré")
             else:
                 st.error("Renseigne une plaque")
+
+        st.markdown("---")
+        st.markdown("### 💾 Sauvegarde manuelle")
+        st.caption("Force la sauvegarde de la base sur GitHub")
+        if st.button("🔄 Sauvegarder maintenant sur GitHub"):
+            if upload_db("Sauvegarde manuelle"):
+                st.success("✅ Base sauvegardée sur GitHub !")
+            else:
+                st.error("❌ Échec de la sauvegarde. Vérifie le token.")
