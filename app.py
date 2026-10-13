@@ -2,12 +2,15 @@ import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
 import plotly.express as px
+import base64
+from PIL import Image
+from io import BytesIO
 from database import (init_db, ajouter_trajet, get_trajets, get_vehicule,
                       save_vehicule, get_toutes_plaques, get_toutes_annees,
                       get_tous_chauffeurs, get_user, get_tous_users, creer_user,
                       supprimer_user, ajouter_conge, get_conges, supprimer_conge,
                       ajouter_planning, get_planning, supprimer_planning,
-                      valider_trajet, get_trajet_by_id)
+                      valider_trajet, get_trajet_by_id, get_photos_trajet)
 from calculs import (calculer_km, estimer_carburant_restant,
                      calculer_moyennes, calculer_cout_gasoil, get_col,
                      calculer_heures_travail)
@@ -61,6 +64,32 @@ if not user:
     st.stop()
 
 username, role, nom_complet = user
+
+# ============ FONCTIONS UTILITAIRES PHOTOS ============
+def image_to_base64(uploaded_file):
+    """Convertit un fichier uploadé en base64."""
+    if uploaded_file is None:
+        return ""
+    try:
+        img = Image.open(uploaded_file)
+        img.thumbnail((800, 800))
+        # Convertir en RGB si nécessaire (pour éviter les erreurs avec PNG transparent)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=70)
+        return base64.b64encode(buffer.getvalue()).decode()
+    except Exception as e:
+        return ""
+
+def base64_to_image(b64_string):
+    """Convertit du base64 en image affichable."""
+    if not b64_string:
+        return None
+    try:
+        return base64.b64decode(b64_string)
+    except:
+        return None
 
 # ============ HEADER ============
 col_titre, col_user = st.columns([4, 1])
@@ -147,14 +176,14 @@ with tab1:
             heure_debut = st.text_input("Heure de début (HH:MM)", value="08:00")
 
             st.markdown("### 📸 Photo km DÉPART (obligatoire)")
-            photo_depart = st.file_uploader(
-                "Prends en photo ton compteur km au départ",
-                type=["jpg", "jpeg", "png"],
+            st.caption("Prends en photo ton compteur km")
+            photo_depart = st.camera_input(
+                "Photo du compteur km au départ",
                 key="upload_depart"
             )
             if photo_depart:
                 st.session_state.photo_depart = photo_depart
-                st.image(photo_depart, width=200, caption="Photo départ")
+                st.success("✅ Photo départ prise")
 
             km_depart = st.number_input(
                 "Km au départ (à recopier de la photo) *",
@@ -181,14 +210,14 @@ with tab1:
             heure_fin = st.text_input("Heure de fin (HH:MM)", value="18:00")
 
             st.markdown("### 📸 Photo km ARRIVÉE (obligatoire)")
-            photo_arrivee = st.file_uploader(
-                "Prends en photo ton compteur km à l'arrivée",
-                type=["jpg", "jpeg", "png"],
+            st.caption("Prends en photo ton compteur km à l'arrivée")
+            photo_arrivee = st.camera_input(
+                "Photo du compteur km à l'arrivée",
                 key="upload_arrivee"
             )
             if photo_arrivee:
                 st.session_state.photo_arrivee = photo_arrivee
-                st.image(photo_arrivee, width=200, caption="Photo arrivée")
+                st.success("✅ Photo arrivée prise")
 
             km_arrivee = st.number_input(
                 "Km à l'arrivée (à recopier de la photo) *",
@@ -229,6 +258,10 @@ with tab1:
                 cout_gasoil = calculer_cout_gasoil(litres_ajoutes, prix_litre)
                 heures = calculer_heures_travail(heure_debut, heure_fin)
 
+                # Convertir les photos en base64
+                photo_depart_b64 = image_to_base64(st.session_state.photo_depart)
+                photo_arrivee_b64 = image_to_base64(st.session_state.photo_arrivee)
+
                 data = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "plaque": plaque, "chauffeur": chauffeur,
@@ -240,8 +273,8 @@ with tab1:
                     "colis_livres_relais": int(colis_relais),
                     "colis_non_livres": int(colis_non_livres),
                     "niveau_carburant_fin": round(carburant_restant, 2),
-                    "photo_depart": st.session_state.photo_depart.name,
-                    "photo_arrivee": st.session_state.photo_arrivee.name,
+                    "photo_depart": photo_depart_b64,
+                    "photo_arrivee": photo_arrivee_b64,
                     "heure_debut": heure_debut, "heure_fin": heure_fin,
                     "valide": 1
                 }
@@ -302,6 +335,43 @@ if tab2:
             c12.metric("🛢️ Litres totaux", f"{m['total_litres']:.1f} L")
             c13.metric("🕐 Heures totales", f"{m['total_heures']:.1f} h")
 
+            # ========= PHOTOS DES TRAJETS (admin seulement) =========
+            if role == "admin":
+                st.markdown("### 📸 Photos des trajets récents")
+                st.caption("Clique sur un trajet pour voir les photos km départ/arrivée")
+
+                for t in trajets[:10]:
+                    trajet_id = get_col(t, 0)
+                    date_t = get_col(t, 1)
+                    plaque_t = get_col(t, 2)
+                    chauffeur_t = get_col(t, 3)
+
+                    with st.expander(f"📸 {date_t} - {plaque_t} - {chauffeur_t}"):
+                        photos = get_photos_trajet(trajet_id)
+                        col_p1, col_p2 = st.columns(2)
+
+                        with col_p1:
+                            st.markdown("**📷 Km DÉPART**")
+                            if photos[0]:
+                                img_bytes = base64_to_image(photos[0])
+                                if img_bytes:
+                                    st.image(img_bytes, use_container_width=True)
+                                else:
+                                    st.info("Photo indisponible")
+                            else:
+                                st.info("Aucune photo")
+
+                        with col_p2:
+                            st.markdown("**📷 Km ARRIVÉE**")
+                            if photos[1]:
+                                img_bytes = base64_to_image(photos[1])
+                                if img_bytes:
+                                    st.image(img_bytes, use_container_width=True)
+                                else:
+                                    st.info("Photo indisponible")
+                            else:
+                                st.info("Aucune photo")
+
             st.markdown("### 📋 Historique")
             df = pd.DataFrame(trajets, columns=[
                 "ID", "Date", "Plaque", "Chauffeur", "Km départ", "Km arrivée",
@@ -310,9 +380,11 @@ if tab2:
                 "Carburant (L)", "Photo départ", "Photo arrivée",
                 "H début", "H fin", "Validé"
             ])
-            st.dataframe(df, use_container_width=True)
+            # Masquer le contenu base64 pour l'affichage
+            df_display = df.drop(columns=["Photo départ", "Photo arrivée"])
+            st.dataframe(df_display, use_container_width=True)
 
-            csv = df.to_csv(index=False).encode('utf-8')
+            csv = df_display.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Télécharger CSV", csv,
                              f"trajets_{datetime.now().strftime('%Y%m%d')}.csv",
                              "text/csv")
