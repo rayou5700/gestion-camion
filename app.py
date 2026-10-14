@@ -725,4 +725,43 @@ if tab9:
                         noms_chauffeurs = [u[3] for u in users_g]
                         trajets_groupe = []
                         for t in get_trajets(limite=500):
-                            if len(t) >= 
+                            if len(t) >= 20 and get_col(t, 3) in noms_chauffeurs:
+                                trajets_groupe.append(t)
+
+                        if trajets_groupe:
+                            m = calculer_moyennes(trajets_groupe)
+                            c1, c2, c3 = st.columns(3)
+                            c1.metric("📅 Trajets", len(trajets_groupe))
+                            c2.metric("📏 Km total", f"{m['total_km']:.0f} km")
+                            c3.metric("💰 Coût total", f"{m['cout_total']:.2f} €")
+
+                            c4, c5, c6 = st.columns(3)
+                            c4.metric("📦 Colis livrés/jour", m['colis_client'] + m['colis_relais'])
+                            c5.metric("⛽ Conso moyenne", f"{m['conso']} L/100km")
+                            c6.metric("🕐 Heures totales", f"{m['total_heures']:.1f} h")
+                        else:
+                            st.info("Aucun trajet enregistré pour ce groupe.")
+
+# ================= ONGLET 10 : CONFIG =================
+if tab10:
+    with tab10:
+        st.subheader("⚙️ Configuration véhicule")
+        plaque_cfg = st.text_input("Plaque", key="plaque_cfg")
+        capacite_cfg = st.number_input("Capacité réservoir (L)", min_value=0.0, value=400.0, step=10.0)
+        conso_cfg = st.number_input("Conso référence (L/100km)", min_value=0.0, value=30.0, step=1.0)
+        if st.button("Enregistrer la configuration"):
+            if plaque_cfg:
+                save_vehicule(plaque_cfg, capacite_cfg, conso_cfg)
+                upload_db(f"Config véhicule {plaque_cfg}")
+                st.success(f"✅ {plaque_cfg} configuré")
+            else:
+                st.error("Renseigne une plaque")
+
+        st.markdown("---")
+        st.markdown("### 💾 Sauvegarde manuelle")
+        st.caption("Force la sauvegarde de la base sur GitHub")
+        if st.button("🔄 Sauvegarder maintenant sur GitHub"):
+            if upload_db("Sauvegarde manuelle"):
+                st.success("✅ Base sauvegardée sur GitHub !")
+            else:
+                st.error("❌ Échec de la sauvegarde. Vérifie le token.")
