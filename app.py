@@ -58,7 +58,14 @@ h3 { font-size: 1.2rem !important; }
 """, unsafe_allow_html=True)
 
 # ============ SYNCHRO GITHUB ============
-init_sync()
+import os
+sync_reussi = init_sync()
+
+# Si la synchro échoue ET qu'aucune base locale n'existe, on prévient
+if not sync_reussi and not os.path.exists("donnees.db"):
+    st.error("⚠️ Impossible de charger la base. Réessaie dans 30 secondes.")
+    st.stop()
+
 init_db()
 
 # ============ CONNEXION OBLIGATOIRE ============
