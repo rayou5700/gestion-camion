@@ -2,7 +2,7 @@ import streamlit as st
 from database import get_user
 
 def login():
-    """Affiche l'écran de connexion. Retourne (username, role, nom)."""
+    """Affiche l'écran de connexion. Retourne (username, role, nom, groupe)."""
     if "user" not in st.session_state:
         st.session_state.user = None
 
@@ -38,14 +38,15 @@ def login():
                     st.query_params["u"] = username
                     st.query_params["p"] = password
                 else:
-                    # Sinon on efface
                     try:
                         del st.query_params["u"]
                         del st.query_params["p"]
                     except:
                         pass
 
-                st.session_state.user = (user[0], user[2], user[3])
+                # Récupérer le groupe s'il existe
+                groupe = user[4] if len(user) > 4 and user[4] else ""
+                st.session_state.user = (user[0], user[2], user[3], groupe)
                 st.rerun()
             else:
                 st.error("❌ Identifiants incorrects")
