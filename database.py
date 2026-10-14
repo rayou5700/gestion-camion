@@ -7,7 +7,7 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
 
-    # Table trajets (avec photo et heures)
+    # Table trajets
     c.execute("""
         CREATE TABLE IF NOT EXISTS trajets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,15 +42,26 @@ def init_db():
         )
     """)
 
-    # Table utilisateurs
+    # Table utilisateurs AVEC le champ groupe
     c.execute("""
         CREATE TABLE IF NOT EXISTS utilisateurs (
             username TEXT PRIMARY KEY,
             password TEXT,
             role TEXT,
-            nom_complet TEXT
+            nom_complet TEXT,
+            groupe TEXT DEFAULT ''
         )
     """)
+
+    # Migration : ajouter la colonne groupe si elle n'existe pas (pour anciennes bases)
+    try:
+        c.execute("PRAGMA table_info(utilisateurs)")
+        colonnes = [col[1] for col in c.fetchall()]
+        if "groupe" not in colonnes:
+            c.execute("ALTER TABLE utilisateurs ADD COLUMN groupe TEXT DEFAULT ''")
+            print("✅ Migration : colonne 'groupe' ajoutée")
+    except Exception as e:
+        print(f"⚠️ Migration : {e}")
 
     # Table conges
     c.execute("""
@@ -74,14 +85,15 @@ def init_db():
         )
     """)
 
-            # Créer admin serhane s'il n'existe pas
+    # Créer admin serhane s'il n'existe pas
     c.execute("SELECT COUNT(*) FROM utilisateurs WHERE username='serhane'")
     if c.fetchone()[0] == 0:
-        c.execute("INSERT INTO utilisateurs VALUES (?, ?, ?, ?)",
-                  ("serhane", "stef57340", "admin", "Serhane"))
+        c.execute("INSERT INTO utilisateurs (username, password, role, nom_complet, groupe) VALUES (?, ?, ?, ?, ?)",
+                  ("serhane", "stef57340", "admin", "Serhane", ""))
 
     conn.commit()
     conn.close()
+
 
 # ============ TRAJETS ============
 def ajouter_trajet(data):
@@ -108,12 +120,14 @@ def ajouter_trajet(data):
     conn.commit()
     conn.close()
 
+
 def valider_trajet(trajet_id):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("UPDATE trajets SET valide=1 WHERE id=?", (trajet_id,))
     conn.commit()
     conn.close()
+
 
 def get_trajets(plaque=None, mois=None, annee=None, chauffeur=None, limite=500):
     conn = sqlite3.connect(DB_NAME)
@@ -142,6 +156,7 @@ def get_trajets(plaque=None, mois=None, annee=None, chauffeur=None, limite=500):
     conn.close()
     return rows
 
+
 def get_trajet_by_id(trajet_id):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -149,6 +164,7 @@ def get_trajet_by_id(trajet_id):
     row = c.fetchone()
     conn.close()
     return row
+
 
 def get_toutes_plaques():
     conn = sqlite3.connect(DB_NAME)
@@ -158,6 +174,7 @@ def get_toutes_plaques():
     conn.close()
     return rows
 
+
 def get_toutes_annees():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -165,6 +182,7 @@ def get_toutes_annees():
     rows = [r[0] for r in c.fetchall() if r[0]]
     conn.close()
     return rows
+
 
 def get_tous_chauffeurs():
     conn = sqlite3.connect(DB_NAME)
@@ -174,6 +192,7 @@ def get_tous_chauffeurs():
     conn.close()
     return rows
 
+
 # ============ VEHICULES ============
 def get_vehicule(plaque):
     conn = sqlite3.connect(DB_NAME)
@@ -182,6 +201,7 @@ def get_vehicule(plaque):
     row = c.fetchone()
     conn.close()
     return row
+
 
 def save_vehicule(plaque, capacite, conso):
     conn = sqlite3.connect(DB_NAME)
@@ -196,6 +216,7 @@ def save_vehicule(plaque, capacite, conso):
     conn.commit()
     conn.close()
 
+
 # ============ UTILISATEURS ============
 def get_user(username):
     conn = sqlite3.connect(DB_NAME)
@@ -205,22 +226,26 @@ def get_user(username):
     conn.close()
     return row
 
+
 def get_tous_users():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT * FROM utilisateurs ORDER BY role DESC, username")
+    c.execute("SELECT * FROM utilisateurs ORDER BY groupe, role DESC, username")
     rows = c.fetchall()
     conn.close()
     return rows
 
-def creer_user(username, password, role, nom_complet):
+
+def creer_user(username, password, role, nom_complet, groupe=""):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("""
-        INSERT OR REPLACE INTO utilisateurs VALUES (?, ?, ?, ?)
-    """, (username, password, role, nom_complet))
+        INSERT OR REPLACE INTO utilisateurs (username, password, role, nom_complet, groupe)
+        VALUES (?, ?, ?, ?, ?)
+    """, (username, password, role, nom_complet, groupe))
     conn.commit()
     conn.close()
+
 
 def supprimer_user(username):
     conn = sqlite3.connect(DB_NAME)
@@ -228,6 +253,25 @@ def supprimer_user(username):
     c.execute("DELETE FROM utilisateurs WHERE username=?", (username,))
     conn.commit()
     conn.close()
+
+
+def get_groupes():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT groupe FROM utilisateurs WHERE groupe != '' AND groupe IS NOT NULL ORDER BY groupe")
+    rows = [r[0] for r in c.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_users_par_groupe(groupe):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT * FROM utilisateurs WHERE groupe=? ORDER BY username", (groupe,))
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
 
 # ============ CONGES ============
 def ajouter_conge(chauffeur, date_debut, date_fin, motif):
@@ -240,6 +284,7 @@ def ajouter_conge(chauffeur, date_debut, date_fin, motif):
     conn.commit()
     conn.close()
 
+
 def get_conges(chauffeur=None):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -251,12 +296,14 @@ def get_conges(chauffeur=None):
     conn.close()
     return rows
 
+
 def supprimer_conge(conge_id):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("DELETE FROM conges WHERE id=?", (conge_id,))
     conn.commit()
     conn.close()
+
 
 # ============ PLANNING ============
 def ajouter_planning(date, chauffeur, plaque, description):
@@ -268,6 +315,7 @@ def ajouter_planning(date, chauffeur, plaque, description):
     """, (date, chauffeur, plaque, description))
     conn.commit()
     conn.close()
+
 
 def get_planning(semaine_debut=None):
     conn = sqlite3.connect(DB_NAME)
@@ -284,24 +332,16 @@ def get_planning(semaine_debut=None):
     conn.close()
     return rows
 
+
 def supprimer_planning(planning_id):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("DELETE FROM planning WHERE id=?", (planning_id,))
     conn.commit()
     conn.close()
-    
 
-def get_photos_trajet(trajet_id):
-    """Récupère les photos d'un trajet (base64)."""
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT photo_depart, photo_arrivee FROM trajets WHERE id=?", (trajet_id,))
-    row = c.fetchone()
-    conn.close()
-    return row if row else (None, None)
-    
 
+# ============ PHOTOS ============
 def get_photos_trajet(trajet_id):
     """Récupère les photos d'un trajet (base64)."""
     conn = sqlite3.connect(DB_NAME)
