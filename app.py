@@ -75,7 +75,7 @@ if not user:
 
 username, role, nom_complet, groupe_user = user
 
-# ============ FONCTIONS UTILITAIRES PHOTOS ============
+# ============ FONCTIONS PHOTOS ============
 def image_to_base64(uploaded_file):
     if uploaded_file is None:
         return ""
@@ -87,7 +87,7 @@ def image_to_base64(uploaded_file):
         buffer = BytesIO()
         img.save(buffer, format="JPEG", quality=70)
         return base64.b64encode(buffer.getvalue()).decode()
-    except Exception as e:
+    except:
         return ""
 
 def base64_to_image(b64_string):
@@ -111,17 +111,15 @@ with col_user:
 
 st.markdown("---")
 
-# ============ ALERTES GLOBALES ============
+# ============ ALERTES ============
 def afficher_alertes():
     alertes = []
-    plaques = get_toutes_plaques()
-    for p in plaques:
+    for p in get_toutes_plaques():
         trajets = get_trajets(plaque=p, limite=1)
         if trajets:
             carburant = get_col(trajets[0], 14, 0)
             if carburant < 50:
                 alertes.append(f"⚠️ **{p}** : carburant bas (**{carburant:.1f} L**)")
-
     if alertes:
         with st.expander("🔔 Alertes", expanded=True):
             for a in alertes:
@@ -129,7 +127,7 @@ def afficher_alertes():
 
 afficher_alertes()
 
-# ============ SIDEBAR FILTRES ============
+# ============ SIDEBAR ============
 st.sidebar.header("🔍 Filtres")
 plaques_dispo = get_toutes_plaques()
 annees_dispo = get_toutes_annees()
@@ -144,14 +142,12 @@ annee_filtre = st.sidebar.selectbox("Année", ["Toutes"] + annees_dispo)
 
 if role == "admin":
     groupe_filtre = st.sidebar.selectbox("Groupe", ["Tous"] + groupes_dispo if groupes_dispo else ["Tous"])
-    chauffeur_filtre = st.sidebar.selectbox(
-        "Chauffeur", ["Tous"] + chauffeurs_dispo
-    )
+    chauffeur_filtre = st.sidebar.selectbox("Chauffeur", ["Tous"] + chauffeurs_dispo)
 else:
     groupe_filtre = groupe_user
     chauffeur_filtre = nom_complet
 
-# ============ CONSTRUCTION DES ONGLETS SELON RÔLE ============
+# ============ ONGLETS ============
 if role == "admin":
     onglets = st.tabs([
         "📝 Nouveau trajet", "📊 Statistiques", "📈 Graphiques",
@@ -189,22 +185,13 @@ with tab1:
 
             st.markdown("### 📸 Photo km DÉPART (obligatoire)")
             st.caption("Prends en photo ton compteur km")
-            photo_depart = st.camera_input(
-                "Photo du compteur km au départ",
-                key="upload_depart"
-            )
+            photo_depart = st.camera_input("Photo du compteur km au départ", key="upload_depart")
             if photo_depart:
                 st.session_state.photo_depart = photo_depart
                 st.success("✅ Photo départ prise")
 
-            km_depart = st.number_input(
-                "Km au départ (à recopier de la photo) *",
-                min_value=0.0, value=0.0, step=1.0
-            )
-            niveau_debut = st.number_input(
-                "Niveau carburant au départ (L)",
-                min_value=0.0, value=0.0, step=1.0
-            )
+            km_depart = st.number_input("Km au départ (à recopier de la photo) *", min_value=0.0, value=0.0, step=1.0)
+            niveau_debut = st.number_input("Niveau carburant au départ (L)", min_value=0.0, value=0.0, step=1.0)
 
         with col2:
             st.markdown("### ⛽ Carburant")
@@ -223,18 +210,12 @@ with tab1:
 
             st.markdown("### 📸 Photo km ARRIVÉE (obligatoire)")
             st.caption("Prends en photo ton compteur km à l'arrivée")
-            photo_arrivee = st.camera_input(
-                "Photo du compteur km à l'arrivée",
-                key="upload_arrivee"
-            )
+            photo_arrivee = st.camera_input("Photo du compteur km à l'arrivée", key="upload_arrivee")
             if photo_arrivee:
                 st.session_state.photo_arrivee = photo_arrivee
                 st.success("✅ Photo arrivée prise")
 
-            km_arrivee = st.number_input(
-                "Km à l'arrivée (à recopier de la photo) *",
-                min_value=0.0, value=0.0, step=1.0
-            )
+            km_arrivee = st.number_input("Km à l'arrivée (à recopier de la photo) *", min_value=0.0, value=0.0, step=1.0)
 
         soumettre = st.form_submit_button("💾 Enregistrer et valider la journée", type="primary")
 
@@ -264,9 +245,7 @@ with tab1:
                     veh = get_vehicule(plaque)
                 conso_moyenne = veh[2]
 
-                carburant_restant = estimer_carburant_restant(
-                    niveau_debut, litres_ajoutes, km, conso_moyenne
-                )
+                carburant_restant = estimer_carburant_restant(niveau_debut, litres_ajoutes, km, conso_moyenne)
                 cout_gasoil = calculer_cout_gasoil(litres_ajoutes, prix_litre)
                 heures = calculer_heures_travail(heure_debut, heure_fin)
 
@@ -315,11 +294,9 @@ if tab2:
 
         trajets = get_trajets(plaque_stats, mois_stats, annee_stats)
 
-        # Filtrage par rôle / groupe
         if role == "salarie":
             trajets = [t for t in trajets if get_col(t, 3) == nom_complet]
         elif role == "admin" and groupe_filtre != "Tous" and groupe_filtre:
-            # Filtrer par groupe
             users_groupe = get_users_par_groupe(groupe_filtre)
             noms_groupe = [u[3] for u in users_groupe]
             trajets = [t for t in trajets if get_col(t, 3) in noms_groupe]
@@ -357,17 +334,14 @@ if tab2:
             if role == "admin":
                 st.markdown("### 📸 Photos des trajets récents")
                 st.caption("Clique sur un trajet pour voir les photos km départ/arrivée")
-
                 for t in trajets[:10]:
                     trajet_id = get_col(t, 0)
                     date_t = get_col(t, 1)
                     plaque_t = get_col(t, 2)
                     chauffeur_t = get_col(t, 3)
-
                     with st.expander(f"📸 {date_t} - {plaque_t} - {chauffeur_t}"):
                         photos = get_photos_trajet(trajet_id)
                         col_p1, col_p2 = st.columns(2)
-
                         with col_p1:
                             st.markdown("**📷 Km DÉPART**")
                             if photos[0]:
@@ -378,7 +352,6 @@ if tab2:
                                     st.info("Photo indisponible")
                             else:
                                 st.info("Aucune photo")
-
                         with col_p2:
                             st.markdown("**📷 Km ARRIVÉE**")
                             if photos[1]:
@@ -410,7 +383,6 @@ if tab2:
 if tab3:
     with tab3:
         st.subheader("📈 Graphiques")
-
         plaque_stats = plaque_filtre if plaque_filtre != "Toutes" else None
         trajets = get_trajets(plaque_stats, limite=200)
         trajets = [t for t in trajets if len(t) >= 20]
@@ -427,23 +399,17 @@ if tab3:
             ])
             df["Date"] = pd.to_datetime(df["Date"])
             df = df.sort_values("Date")
-
             df["Conso"] = (df["Litres"] / df["Km parcourus"] * 100).round(2)
             df_conso = df[df["Conso"] > 0]
 
             if not df_conso.empty:
                 st.markdown("### ⛽ Courbe de consommation (L/100km)")
-                fig = px.line(df_conso, x="Date", y="Conso",
-                             markers=True, title="Évolution de la consommation")
+                fig = px.line(df_conso, x="Date", y="Conso", markers=True, title="Évolution de la consommation")
                 st.plotly_chart(fig, use_container_width=True)
 
             st.markdown("### 📦 Répartition des colis")
-            total_client = df["Client"].sum()
-            total_relais = df["Relais"].sum()
-            total_non_livres = df["Non livrés"].sum()
-
             fig2 = px.pie(
-                values=[total_client, total_relais, total_non_livres],
+                values=[df["Client"].sum(), df["Relais"].sum(), df["Non livrés"].sum()],
                 names=["Livrés client", "Livrés relais", "Non livrés"],
                 title="Répartition des colis",
                 color_discrete_sequence=["#4CAF50", "#2196F3", "#F44336"]
@@ -455,8 +421,7 @@ if tab3:
             st.plotly_chart(fig3, use_container_width=True)
 
             df["Cout"] = df["Litres"] * df["Prix/L"]
-            fig4 = px.bar(df[df["Cout"] > 0], x="Date", y="Cout",
-                         title="Coût gasoil par jour (€)")
+            fig4 = px.bar(df[df["Cout"] > 0], x="Date", y="Cout", title="Coût gasoil par jour (€)")
             st.plotly_chart(fig4, use_container_width=True)
 
 # ================= ONGLET 4 : ALERTES =================
@@ -481,18 +446,13 @@ if tab4:
                         st.success(f"✅ **{p}** : {carburant:.1f} L")
 
         st.markdown("### 📦 Colis non livrés")
-        trajets_recents = get_trajets(limite=20)
-        trajets_recents = [t for t in trajets_recents if len(t) >= 20]
-        for t in trajets_recents:
+        for t in [t for t in get_trajets(limite=20) if len(t) >= 20]:
             non_livres = get_col(t, 13, 0)
             if non_livres > 0:
-                date = get_col(t, 1)
-                plaque = get_col(t, 2)
-                st.warning(f"📦 **{date}** - {plaque} : **{non_livres}** colis non livrés")
+                st.warning(f"📦 **{get_col(t, 1)}** - {get_col(t, 2)} : **{non_livres}** colis non livrés")
 
         st.markdown("### 📊 Consommation anormale")
-        trajets_all = get_trajets(limite=100)
-        trajets_all = [t for t in trajets_all if len(t) >= 20]
+        trajets_all = [t for t in get_trajets(limite=100) if len(t) >= 20]
         if len(trajets_all) > 5:
             m = calculer_moyennes(trajets_all)
             conso_moy = m['conso']
@@ -502,15 +462,13 @@ if tab4:
                 if km > 0 and litres > 0:
                     conso = (litres / km) * 100
                     if conso > conso_moy * 1.3:
-                        st.error(f"🚨 **{get_col(t, 1)}** : conso anormale **{conso:.1f} L/100km** (moyenne {conso_moy})")
+                        st.error(f"🚨 **{get_col(t, 1)}** : conso anormale **{conso:.1f} L/100km**")
 
 # ================= ONGLET 5 : CALENDRIER =================
 if tab5:
     with tab5:
         st.subheader("📅 Calendrier des trajets")
-
-        trajets = get_trajets(limite=200)
-        trajets = [t for t in trajets if len(t) >= 20]
+        trajets = [t for t in get_trajets(limite=200) if len(t) >= 20]
         if role == "salarie":
             trajets = [t for t in trajets if get_col(t, 3) == nom_complet]
 
@@ -526,17 +484,11 @@ if tab5:
             ])
             df["Date"] = pd.to_datetime(df["Date"])
             df["Jour"] = df["Date"].dt.date
-
             resume = df.groupby("Jour").agg({
-                "Km parcourus": "sum",
-                "Client": "sum",
-                "Relais": "sum",
-                "Non livrés": "sum"
+                "Km parcourus": "sum", "Client": "sum", "Relais": "sum", "Non livrés": "sum"
             }).reset_index()
             resume.columns = ["Jour", "Km", "Livrés client", "Livrés relais", "Non livrés"]
-
             st.dataframe(resume, use_container_width=True)
-
             fig = px.bar(resume, x="Jour", y="Km", title="Km par jour")
             st.plotly_chart(fig, use_container_width=True)
 
@@ -544,7 +496,6 @@ if tab5:
 if tab6:
     with tab6:
         st.subheader("📆 Planning hebdomadaire")
-
         with st.form("form_planning"):
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -565,29 +516,25 @@ if tab6:
             st.rerun()
 
         st.markdown("### 📋 Planning des 7 prochains jours")
-        aujourd_hui = datetime.now().date()
-        planning = get_planning(str(aujourd_hui))
-
+        planning = get_planning(str(datetime.now().date()))
         if not planning:
             st.info("Rien de prévu cette semaine.")
         else:
             for p in planning:
-                with st.container():
-                    col1, col2 = st.columns([5, 1])
-                    with col1:
-                        st.markdown(f"**{p[1]}** - 👤 {p[2]} - 🚛 {p[3]}")
-                        st.caption(f"📝 {p[4]}")
-                    with col2:
-                        if st.button("🗑️", key=f"del_plan_{p[0]}"):
-                            supprimer_planning(p[0])
-                            upload_db("Suppression planning")
-                            st.rerun()
+                col1, col2 = st.columns([5, 1])
+                with col1:
+                    st.markdown(f"**{p[1]}** - 👤 {p[2]} - 🚛 {p[3]}")
+                    st.caption(f"📝 {p[4]}")
+                with col2:
+                    if st.button("🗑️", key=f"del_plan_{p[0]}"):
+                        supprimer_planning(p[0])
+                        upload_db("Suppression planning")
+                        st.rerun()
 
 # ================= ONGLET 7 : CONGÉS =================
 if tab7:
     with tab7:
         st.subheader("🏖️ Gestion des congés")
-
         if role == "admin":
             with st.form("form_conge"):
                 col1, col2, col3 = st.columns(3)
@@ -600,13 +547,11 @@ if tab7:
                     fin = st.date_input("Date de fin")
                 motif = st.text_input("Motif (optionnel)")
                 submit = st.form_submit_button("➕ Ajouter congé")
-
             if submit:
                 ajouter_conge(chauffeur_conge, str(debut), str(fin), motif)
                 upload_db("Nouveau congé")
                 st.success("✅ Congé ajouté")
                 st.rerun()
-
             conges = get_conges()
         else:
             conges = get_conges(nom_complet)
@@ -627,7 +572,7 @@ if tab7:
                         upload_db("Suppression congé")
                         st.rerun()
 
-# ================= ONGLET 8 : UTILISATEURS (admin only) =================
+# ================= ONGLET 8 : UTILISATEURS =================
 if tab8:
     with tab8:
         st.subheader("👥 Gestion des utilisateurs")
@@ -643,13 +588,10 @@ if tab8:
             with col2:
                 new_pass = st.text_input("Mot de passe", type="password")
                 new_role = st.selectbox("Rôle", ["salarie", "admin"])
-
             groupe_choisi = st.selectbox("Groupe / Société", groupes_options)
-
             nouveau_groupe = ""
             if groupe_choisi == "+ Nouveau groupe...":
                 nouveau_groupe = st.text_input("Nom du nouveau groupe (ex: DPD, GLS...)")
-
             submit = st.form_submit_button("➕ Créer / Modifier")
 
         if submit:
@@ -660,7 +602,6 @@ if tab8:
                     groupe_final = ""
                 else:
                     groupe_final = groupe_choisi
-
                 creer_user(new_user, new_pass, new_role, new_nom, groupe_final)
                 upload_db(f"Création utilisateur {new_user}")
                 st.success(f"✅ Utilisateur {new_user} enregistré (Groupe : {groupe_final or 'Aucun'})")
@@ -668,13 +609,10 @@ if tab8:
             else:
                 st.error("Tous les champs sont obligatoires")
 
-               st.markdown("### 👥 Utilisateurs existants")
+        st.markdown("### 👥 Utilisateurs existants")
 
         groupes_filtre = get_groupes()
-        filtre_groupe = st.selectbox(
-            "Filtrer par groupe",
-            ["Tous"] + groupes_filtre + ["(Sans groupe)"]
-        )
+        filtre_groupe = st.selectbox("Filtrer par groupe", ["Tous"] + groupes_filtre + ["(Sans groupe)"])
 
         users = get_tous_users()
         if filtre_groupe == "(Sans groupe)":
@@ -682,7 +620,6 @@ if tab8:
         elif filtre_groupe != "Tous":
             users = [u for u in users if len(u) > 4 and u[4] == filtre_groupe]
 
-        # Initialiser le mode édition
         if "edit_user" not in st.session_state:
             st.session_state.edit_user = None
 
@@ -694,72 +631,61 @@ if tab8:
                 st.markdown(f"**{u[3]}** (`{u[0]}`) - {role_badge}{groupe_badge}")
             with col2:
                 if u[0] != "serhane":
-                    if st.button("✏️", key=f"edit_btn_{u[0]}", help="Modifier cet utilisateur"):
+                    if st.button("✏️", key=f"edit_btn_{u[0]}"):
                         st.session_state.edit_user = u[0]
                         st.rerun()
             with col3:
-                if u[0] != "serhane" and st.button("🗑️", key=f"del_user_{u[0]}", help="Supprimer"):
+                if u[0] != "serhane" and st.button("🗑️", key=f"del_user_{u[0]}"):
                     supprimer_user(u[0])
                     upload_db("Suppression utilisateur")
                     st.rerun()
 
-        # ===== FORMULAIRE DE MODIFICATION =====
         if st.session_state.edit_user:
             user_to_edit = get_user(st.session_state.edit_user)
-            
             if user_to_edit:
                 st.markdown("---")
                 st.markdown(f"### ✏️ Modifier l'utilisateur **{user_to_edit[3]}**")
-                
                 groupes_existants = get_groupes()
                 groupes_options = ["(Aucun)"] + groupes_existants + ["+ Nouveau groupe..."]
-                
-                # Pré-sélectionner le groupe actuel
                 groupe_actuel = user_to_edit[4] if len(user_to_edit) > 4 and user_to_edit[4] else "(Aucun)"
                 if groupe_actuel not in groupes_options:
                     groupe_actuel = "(Aucun)"
                 index_groupe = groupes_options.index(groupe_actuel)
-                
+
                 with st.form("form_edit_user"):
                     col1, col2 = st.columns(2)
                     with col1:
                         edit_user = st.text_input("Nom d'utilisateur", value=user_to_edit[0], disabled=True)
                         edit_nom = st.text_input("Nom complet", value=user_to_edit[3])
                     with col2:
-                        edit_pass = st.text_input("Nouveau mot de passe (laisser vide = inchangé)", type="password")
-                        edit_role = st.selectbox("Rôle", ["salarie", "admin"], 
+                        edit_pass = st.text_input("Nouveau mot de passe (vide = inchangé)", type="password")
+                        edit_role = st.selectbox("Rôle", ["salarie", "admin"],
                                                   index=0 if user_to_edit[2] == "salarie" else 1)
-                    
                     edit_groupe = st.selectbox("Groupe / Société", groupes_options, index=index_groupe)
-                    
                     edit_nouveau_groupe = ""
                     if edit_groupe == "+ Nouveau groupe...":
                         edit_nouveau_groupe = st.text_input("Nom du nouveau groupe")
-                    
+
                     col_save, col_cancel = st.columns(2)
                     with col_save:
-                        save_edit = st.form_submit_button("💾 Enregistrer les modifications", type="primary")
+                        save_edit = st.form_submit_button("💾 Enregistrer", type="primary")
                     with col_cancel:
                         cancel_edit = st.form_submit_button("❌ Annuler")
-                
+
                 if save_edit:
-                    # Déterminer le groupe final
                     if edit_groupe == "+ Nouveau groupe...":
                         groupe_final = edit_nouveau_groupe.strip()
                     elif edit_groupe == "(Aucun)":
                         groupe_final = ""
                     else:
                         groupe_final = edit_groupe
-                    
-                    # Mot de passe : garder l'ancien si vide
                     password_final = edit_pass if edit_pass else user_to_edit[1]
-                    
                     creer_user(edit_user, password_final, edit_role, edit_nom, groupe_final)
                     upload_db(f"Modification utilisateur {edit_user}")
-                    st.success(f"✅ Utilisateur **{edit_nom}** modifié ! (Groupe : {groupe_final or 'Aucun'})")
+                    st.success(f"✅ Utilisateur **{edit_nom}** modifié !")
                     st.session_state.edit_user = None
                     st.rerun()
-                
+
                 if cancel_edit:
                     st.session_state.edit_user = None
                     st.rerun()
@@ -769,18 +695,15 @@ if tab9:
     with tab9:
         st.subheader("🏢 Gestion des groupes / sociétés")
         st.caption("Organise tes salariés par société (DPD, GLS, etc.)")
-
         groupes = get_groupes()
 
         if not groupes:
             st.info("Aucun groupe créé. Va dans 👥 Utilisateurs pour assigner des groupes.")
         else:
             st.markdown(f"### 📊 Vue d'ensemble - {len(groupes)} groupe(s)")
-
             for g in groupes:
                 users_g = get_users_par_groupe(g)
                 nb_users = len(users_g)
-
                 with st.expander(f"🏢 **{g}** - {nb_users} salarié(s)", expanded=False):
                     if not users_g:
                         st.info("Aucun utilisateur dans ce groupe.")
@@ -788,23 +711,17 @@ if tab9:
                         for u in users_g:
                             role_badge = "👑 Admin" if u[2] == "admin" else "🚚 Salarié"
                             st.markdown(f"- **{u[3]}** (`{u[0]}`) - {role_badge}")
-
                         st.markdown("---")
                         st.markdown(f"**📊 Statistiques du groupe {g}**")
-
                         noms_chauffeurs = [u[3] for u in users_g]
-                        trajets_groupe = []
-                        for t in get_trajets(limite=500):
-                            if len(t) >= 20 and get_col(t, 3) in noms_chauffeurs:
-                                trajets_groupe.append(t)
-
+                        trajets_groupe = [t for t in get_trajets(limite=500)
+                                          if len(t) >= 20 and get_col(t, 3) in noms_chauffeurs]
                         if trajets_groupe:
                             m = calculer_moyennes(trajets_groupe)
                             c1, c2, c3 = st.columns(3)
                             c1.metric("📅 Trajets", len(trajets_groupe))
                             c2.metric("📏 Km total", f"{m['total_km']:.0f} km")
                             c3.metric("💰 Coût total", f"{m['cout_total']:.2f} €")
-
                             c4, c5, c6 = st.columns(3)
                             c4.metric("📦 Colis livrés/jour", m['colis_client'] + m['colis_relais'])
                             c5.metric("⛽ Conso moyenne", f"{m['conso']} L/100km")
