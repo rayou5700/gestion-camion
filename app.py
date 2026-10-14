@@ -10,7 +10,8 @@ from database import (init_db, ajouter_trajet, get_trajets, get_vehicule,
                       get_tous_chauffeurs, get_user, get_tous_users, creer_user,
                       supprimer_user, ajouter_conge, get_conges, supprimer_conge,
                       ajouter_planning, get_planning, supprimer_planning,
-                      valider_trajet, get_trajet_by_id, get_photos_trajet)
+                      valider_trajet, get_trajet_by_id, get_photos_trajet,
+                      get_groupes, get_users_par_groupe)
 from calculs import (calculer_km, estimer_carburant_restant,
                      calculer_moyennes, calculer_cout_gasoil, get_col,
                      calculer_heures_travail)
@@ -61,7 +62,6 @@ h3 { font-size: 1.2rem !important; }
 import os
 sync_reussi = init_sync()
 
-# Si la synchro échoue ET qu'aucune base locale n'existe, on prévient
 if not sync_reussi and not os.path.exists("donnees.db"):
     st.error("⚠️ Impossible de charger la base. Réessaie dans 30 secondes.")
     st.stop()
@@ -73,7 +73,7 @@ user = login()
 if not user:
     st.stop()
 
-username, role, nom_complet = user
+username, role, nom_complet, groupe_user = user
 
 # ============ FONCTIONS UTILITAIRES PHOTOS ============
 def image_to_base64(uploaded_file):
@@ -104,7 +104,9 @@ with col_titre:
     st.title("🚛 Gestion Trajets & Carburant")
 with col_user:
     st.markdown(f"**👤 {nom_complet}**")
-    st.caption(f"Rôle : {'👑 Admin' if role == 'admin' else '🚚 Salarié'}")
+    role_badge = "👑 Admin" if role == "admin" else "🚚 Salarié"
+    groupe_badge = f" | 🏢 {groupe_user}" if groupe_user else ""
+    st.caption(f"Rôle : {role_badge}{groupe_badge}")
     logout()
 
 st.markdown("---")
@@ -132,6 +134,7 @@ st.sidebar.header("🔍 Filtres")
 plaques_dispo = get_toutes_plaques()
 annees_dispo = get_toutes_annees()
 chauffeurs_dispo = get_tous_chauffeurs()
+groupes_dispo = get_groupes()
 
 plaque_filtre = st.sidebar.selectbox("Plaque", ["Toutes"] + plaques_dispo)
 mois_filtre = st.sidebar.selectbox(
@@ -140,10 +143,12 @@ mois_filtre = st.sidebar.selectbox(
 annee_filtre = st.sidebar.selectbox("Année", ["Toutes"] + annees_dispo)
 
 if role == "admin":
+    groupe_filtre = st.sidebar.selectbox("Groupe", ["Tous"] + groupes_dispo if groupes_dispo else ["Tous"])
     chauffeur_filtre = st.sidebar.selectbox(
         "Chauffeur", ["Tous"] + chauffeurs_dispo
     )
 else:
+    groupe_filtre = groupe_user
     chauffeur_filtre = nom_complet
 
 # ============ CONSTRUCTION DES ONGLETS SELON RÔLE ============
@@ -151,15 +156,15 @@ if role == "admin":
     onglets = st.tabs([
         "📝 Nouveau trajet", "📊 Statistiques", "📈 Graphiques",
         "🔔 Alertes", "📅 Calendrier", "📆 Planning", "🏖️ Congés",
-        "👥 Utilisateurs", "⚙️ Config véhicule"
+        "👥 Utilisateurs", "🏢 Groupes", "⚙️ Config véhicule"
     ])
-    (tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9) = onglets
+    (tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10) = onglets
 else:
     onglets = st.tabs([
         "📝 Ma journée", "📊 Mes stats", "📅 Mon calendrier", "🏖️ Mes congés"
     ])
     (tab1, tab2, tab5, tab7) = onglets
-    tab3 = tab4 = tab6 = tab8 = tab9 = None
+    tab3 = tab4 = tab6 = tab8 = tab9 = tab10 = None
 
 # ================= ONGLET 1 : NOUVEAU TRAJET =================
 with tab1:
@@ -309,8 +314,15 @@ if tab2:
         annee_stats = annee_filtre if annee_filtre != "Toutes" else None
 
         trajets = get_trajets(plaque_stats, mois_stats, annee_stats)
+
+        # Filtrage par rôle / groupe
         if role == "salarie":
             trajets = [t for t in trajets if get_col(t, 3) == nom_complet]
+        elif role == "admin" and groupe_filtre != "Tous" and groupe_filtre:
+            # Filtrer par groupe
+            users_groupe = get_users_par_groupe(groupe_filtre)
+            noms_groupe = [u[3] for u in users_groupe]
+            trajets = [t for t in trajets if get_col(t, 3) in noms_groupe]
 
         trajets = [t for t in trajets if len(t) >= 20]
 
@@ -620,6 +632,9 @@ if tab8:
     with tab8:
         st.subheader("👥 Gestion des utilisateurs")
 
+        groupes_existants = get_groupes()
+        groupes_options = ["(Aucun)"] + groupes_existants + ["+ Nouveau groupe..."]
+
         with st.form("form_user"):
             col1, col2 = st.columns(2)
             with col1:
@@ -628,50 +643,86 @@ if tab8:
             with col2:
                 new_pass = st.text_input("Mot de passe", type="password")
                 new_role = st.selectbox("Rôle", ["salarie", "admin"])
+
+            groupe_choisi = st.selectbox("Groupe / Société", groupes_options)
+
+            nouveau_groupe = ""
+            if groupe_choisi == "+ Nouveau groupe...":
+                nouveau_groupe = st.text_input("Nom du nouveau groupe (ex: DPD, GLS...)")
+
             submit = st.form_submit_button("➕ Créer / Modifier")
 
         if submit:
             if new_user and new_pass and new_nom:
-                creer_user(new_user, new_pass, new_role, new_nom)
+                if groupe_choisi == "+ Nouveau groupe...":
+                    groupe_final = nouveau_groupe.strip()
+                elif groupe_choisi == "(Aucun)":
+                    groupe_final = ""
+                else:
+                    groupe_final = groupe_choisi
+
+                creer_user(new_user, new_pass, new_role, new_nom, groupe_final)
                 upload_db(f"Création utilisateur {new_user}")
-                st.success(f"✅ Utilisateur {new_user} enregistré")
+                st.success(f"✅ Utilisateur {new_user} enregistré (Groupe : {groupe_final or 'Aucun'})")
                 st.rerun()
             else:
                 st.error("Tous les champs sont obligatoires")
 
         st.markdown("### 👥 Utilisateurs existants")
+
+        groupes_filtre = get_groupes()
+        filtre_groupe = st.selectbox(
+            "Filtrer par groupe",
+            ["Tous"] + groupes_filtre + ["(Sans groupe)"]
+        )
+
         users = get_tous_users()
+        if filtre_groupe == "(Sans groupe)":
+            users = [u for u in users if (len(u) <= 4 or not u[4])]
+        elif filtre_groupe != "Tous":
+            users = [u for u in users if len(u) > 4 and u[4] == filtre_groupe]
+
         for u in users:
             col1, col2 = st.columns([5, 1])
             with col1:
                 role_badge = "👑 Admin" if u[2] == "admin" else "🚚 Salarié"
-                st.markdown(f"**{u[3]}** (`{u[0]}`) - {role_badge}")
+                groupe_badge = f" - 🏢 **{u[4]}**" if len(u) > 4 and u[4] else ""
+                st.markdown(f"**{u[3]}** (`{u[0]}`) - {role_badge}{groupe_badge}")
             with col2:
                 if u[0] != "serhane" and st.button("🗑️", key=f"del_user_{u[0]}"):
                     supprimer_user(u[0])
                     upload_db("Suppression utilisateur")
                     st.rerun()
 
-# ================= ONGLET 9 : CONFIG =================
+# ================= ONGLET 9 : GROUPES =================
 if tab9:
     with tab9:
-        st.subheader("⚙️ Configuration véhicule")
-        plaque_cfg = st.text_input("Plaque", key="plaque_cfg")
-        capacite_cfg = st.number_input("Capacité réservoir (L)", min_value=0.0, value=400.0, step=10.0)
-        conso_cfg = st.number_input("Conso référence (L/100km)", min_value=0.0, value=30.0, step=1.0)
-        if st.button("Enregistrer la configuration"):
-            if plaque_cfg:
-                save_vehicule(plaque_cfg, capacite_cfg, conso_cfg)
-                upload_db(f"Config véhicule {plaque_cfg}")
-                st.success(f"✅ {plaque_cfg} configuré")
-            else:
-                st.error("Renseigne une plaque")
+        st.subheader("🏢 Gestion des groupes / sociétés")
+        st.caption("Organise tes salariés par société (DPD, GLS, etc.)")
 
-        st.markdown("---")
-        st.markdown("### 💾 Sauvegarde manuelle")
-        st.caption("Force la sauvegarde de la base sur GitHub")
-        if st.button("🔄 Sauvegarder maintenant sur GitHub"):
-            if upload_db("Sauvegarde manuelle"):
-                st.success("✅ Base sauvegardée sur GitHub !")
-            else:
-                st.error("❌ Échec de la sauvegarde. Vérifie le token.")
+        groupes = get_groupes()
+
+        if not groupes:
+            st.info("Aucun groupe créé. Va dans 👥 Utilisateurs pour assigner des groupes.")
+        else:
+            st.markdown(f"### 📊 Vue d'ensemble - {len(groupes)} groupe(s)")
+
+            for g in groupes:
+                users_g = get_users_par_groupe(g)
+                nb_users = len(users_g)
+
+                with st.expander(f"🏢 **{g}** - {nb_users} salarié(s)", expanded=False):
+                    if not users_g:
+                        st.info("Aucun utilisateur dans ce groupe.")
+                    else:
+                        for u in users_g:
+                            role_badge = "👑 Admin" if u[2] == "admin" else "🚚 Salarié"
+                            st.markdown(f"- **{u[3]}** (`{u[0]}`) - {role_badge}")
+
+                        st.markdown("---")
+                        st.markdown(f"**📊 Statistiques du groupe {g}**")
+
+                        noms_chauffeurs = [u[3] for u in users_g]
+                        trajets_groupe = []
+                        for t in get_trajets(limite=500):
+                            if len(t) >= 
