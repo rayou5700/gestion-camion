@@ -668,7 +668,7 @@ if tab8:
             else:
                 st.error("Tous les champs sont obligatoires")
 
-        st.markdown("### 👥 Utilisateurs existants")
+               st.markdown("### 👥 Utilisateurs existants")
 
         groupes_filtre = get_groupes()
         filtre_groupe = st.selectbox(
@@ -682,16 +682,86 @@ if tab8:
         elif filtre_groupe != "Tous":
             users = [u for u in users if len(u) > 4 and u[4] == filtre_groupe]
 
+        # Initialiser le mode édition
+        if "edit_user" not in st.session_state:
+            st.session_state.edit_user = None
+
         for u in users:
-            col1, col2 = st.columns([5, 1])
+            col1, col2, col3 = st.columns([5, 1, 1])
             with col1:
                 role_badge = "👑 Admin" if u[2] == "admin" else "🚚 Salarié"
-                groupe_badge = f" - 🏢 **{u[4]}**" if len(u) > 4 and u[4] else ""
+                groupe_badge = f" - 🏢 **{u[4]}**" if len(u) > 4 and u[4] else " - 🏢 *(aucun)*"
                 st.markdown(f"**{u[3]}** (`{u[0]}`) - {role_badge}{groupe_badge}")
             with col2:
-                if u[0] != "serhane" and st.button("🗑️", key=f"del_user_{u[0]}"):
+                if u[0] != "serhane":
+                    if st.button("✏️", key=f"edit_btn_{u[0]}", help="Modifier cet utilisateur"):
+                        st.session_state.edit_user = u[0]
+                        st.rerun()
+            with col3:
+                if u[0] != "serhane" and st.button("🗑️", key=f"del_user_{u[0]}", help="Supprimer"):
                     supprimer_user(u[0])
                     upload_db("Suppression utilisateur")
+                    st.rerun()
+
+        # ===== FORMULAIRE DE MODIFICATION =====
+        if st.session_state.edit_user:
+            user_to_edit = get_user(st.session_state.edit_user)
+            
+            if user_to_edit:
+                st.markdown("---")
+                st.markdown(f"### ✏️ Modifier l'utilisateur **{user_to_edit[3]}**")
+                
+                groupes_existants = get_groupes()
+                groupes_options = ["(Aucun)"] + groupes_existants + ["+ Nouveau groupe..."]
+                
+                # Pré-sélectionner le groupe actuel
+                groupe_actuel = user_to_edit[4] if len(user_to_edit) > 4 and user_to_edit[4] else "(Aucun)"
+                if groupe_actuel not in groupes_options:
+                    groupe_actuel = "(Aucun)"
+                index_groupe = groupes_options.index(groupe_actuel)
+                
+                with st.form("form_edit_user"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        edit_user = st.text_input("Nom d'utilisateur", value=user_to_edit[0], disabled=True)
+                        edit_nom = st.text_input("Nom complet", value=user_to_edit[3])
+                    with col2:
+                        edit_pass = st.text_input("Nouveau mot de passe (laisser vide = inchangé)", type="password")
+                        edit_role = st.selectbox("Rôle", ["salarie", "admin"], 
+                                                  index=0 if user_to_edit[2] == "salarie" else 1)
+                    
+                    edit_groupe = st.selectbox("Groupe / Société", groupes_options, index=index_groupe)
+                    
+                    edit_nouveau_groupe = ""
+                    if edit_groupe == "+ Nouveau groupe...":
+                        edit_nouveau_groupe = st.text_input("Nom du nouveau groupe")
+                    
+                    col_save, col_cancel = st.columns(2)
+                    with col_save:
+                        save_edit = st.form_submit_button("💾 Enregistrer les modifications", type="primary")
+                    with col_cancel:
+                        cancel_edit = st.form_submit_button("❌ Annuler")
+                
+                if save_edit:
+                    # Déterminer le groupe final
+                    if edit_groupe == "+ Nouveau groupe...":
+                        groupe_final = edit_nouveau_groupe.strip()
+                    elif edit_groupe == "(Aucun)":
+                        groupe_final = ""
+                    else:
+                        groupe_final = edit_groupe
+                    
+                    # Mot de passe : garder l'ancien si vide
+                    password_final = edit_pass if edit_pass else user_to_edit[1]
+                    
+                    creer_user(edit_user, password_final, edit_role, edit_nom, groupe_final)
+                    upload_db(f"Modification utilisateur {edit_user}")
+                    st.success(f"✅ Utilisateur **{edit_nom}** modifié ! (Groupe : {groupe_final or 'Aucun'})")
+                    st.session_state.edit_user = None
+                    st.rerun()
+                
+                if cancel_edit:
+                    st.session_state.edit_user = None
                     st.rerun()
 
 # ================= ONGLET 9 : GROUPES =================
